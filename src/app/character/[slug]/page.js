@@ -21,7 +21,7 @@ export default function CharacterPage() {
   const activeSkill = character.skills[activeSkillIndex];
 
   return (
-    <div className="bg-[#0F1923] text-white min-h-screen px-8 py-5">
+    <div className="bg-[#0F1923] text-gray-300 min-h-screen px-8 py-5">
       <div className="flex flex-col lg:flex-row gap-0">
         {/* รูปด้านซ้าย */}
         <div className="lg:w-1/2 w-full flex justify-center">
@@ -37,7 +37,7 @@ export default function CharacterPage() {
         {/* ข้อมูล + Role + Skill ด้านขวา */}
         <div className="lg:w-1/2 w-full flex flex-col gap-[30px] justify-center">
           <div>
-            <h1 className="text-5xl font-bold italic text-red-500 mb-4">
+            <h1 className="text-5xl font-bold italic text-red-500 mb-4 uppercase">
               {character.name}
             </h1>
             <p className="text-lg leading-relaxed mb-4">
@@ -54,7 +54,7 @@ export default function CharacterPage() {
               <span className="text-red-400 font-semibold">
                 {character.roleTH}
               </span>
-              <span className="text-white">({character.role})</span>
+              <span className="text-white font-bold uppercase">( {character.role} )</span>
             </div>
           </div>
 

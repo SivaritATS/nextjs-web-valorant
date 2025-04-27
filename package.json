@@ -9,7 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.74.7",
     "daisyui": "^5.0.22",
+    "mysql2": "^3.14.1",
     "next": "15.3.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

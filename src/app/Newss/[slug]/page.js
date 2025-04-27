@@ -70,7 +70,6 @@ export default function NewsDetail({ params }) {
         {news.description}
       </p>
 
-      {/* Render section content */}
       {news.sections?.map((section, idx) => (
         <div key={idx} className="mt-8 max-w-4xl text-left w-full text-white">
           <h2 className="text-2xl font-bold border-b pb-2 mb-4">
