@@ -1,103 +1,121 @@
-import mysql from "mysql2/promise";
+import { MongoClient, ObjectId } from "mongodb";
 
-let pool;
+const uri = process.env.MONGODB_URI || "mongodb+srv://valorant_db:SNOPliLCHvOKtEYN@cluster0.sjv1ac7.mongodb.net/valorant_db?appName=Cluster0";
+const options = {};
 
-export function getPool() {
-  if (!pool) {
-    let config = {
-      host: process.env.DB_HOST || "127.0.0.1",
-      port: parseInt(process.env.DB_PORT || "3306", 10),
-      user: process.env.DB_USER || "root",
-      password: process.env.DB_PASSWORD || "",
-      database: process.env.DB_NAME || "valorant_db",
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-      timezone: "+07:00",
-      decimalNumbers: true,
-    };
+let client;
+let clientPromise;
 
-    if (process.env.DATABASE_URL) {
-      try {
-        const url = new URL(process.env.DATABASE_URL);
-        config.host = url.hostname || config.host;
-        config.port = url.port ? parseInt(url.port, 10) : config.port;
-        config.user = url.username ? decodeURIComponent(url.username) : config.user;
-        config.password = url.password ? decodeURIComponent(url.password) : config.password;
-        config.database = url.pathname ? url.pathname.replace(/^\//, "") : config.database;
-      } catch (err) {
-        console.error("Failed to parse DATABASE_URL, using defaults", err);
-      }
-    }
-
-    pool = mysql.createPool(config);
+if (process.env.NODE_ENV === "development") {
+  if (!global._mongoClientPromise) {
+    client = new MongoClient(uri, options);
+    global._mongoClientPromise = client.connect();
   }
-  return pool;
+  clientPromise = global._mongoClientPromise;
+} else {
+  client = new MongoClient(uri, options);
+  clientPromise = client.connect();
 }
 
+export async function getDb() {
+  const conn = await clientPromise;
+  return conn.db();
+}
 
-// สร้างคำสั่งซื้อใหม่
-export async function createDirectOrder(customerData, cartItems) {
-  const pool = getPool();
-  const conn = await pool.getConnection();
+// Fetch all products and map _id to id
+export async function getProducts() {
+  const db = await getDb();
+  const products = await db.collection("products").find({}).toArray();
+  return products.map((product) => ({
+    ...product,
+    id: product._id.toString(),
+    _id: product._id.toString(),
+  }));
+}
 
+// Create order and update stock
+export async function createOrder(customerData, items, totalAmount) {
+  const db = await getDb();
+
+  const orderDoc = {
+    customer_name: customerData.name,
+    customer_email: customerData.email,
+    customer_phone: customerData.phone,
+    shipping_address: customerData.address,
+    total_amount: totalAmount,
+    payment_status: "pending",
+    created_at: new Date(),
+    items: items.map((item) => ({
+      product_id: item.id,
+      product_name: item.name,
+      quantity: item.quantity,
+      price: item.price,
+    })),
+  };
+
+  const client = await clientPromise;
+
+  // Try using transactions if supported (Atlas supports replica sets / transactions)
   try {
-    await conn.beginTransaction();
-    const totalAmount = cartItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    const session = client.startSession();
+    let orderId;
+    try {
+      await session.withTransaction(async () => {
+        const orderResult = await db.collection("orders").insertOne(orderDoc, { session });
+        orderId = orderResult.insertedId.toString();
 
-    // 1. บันทึกข้อมูลคำสั่งซื้อหลัก
+        for (const item of items) {
+          const updateResult = await db.collection("products").updateOne(
+            {
+              _id: ObjectId.isValid(item.id) ? new ObjectId(item.id) : item.id,
+              stock: { $gte: item.quantity },
+            },
+            { $inc: { stock: -item.quantity } },
+            { session }
+          );
 
-    const [orderResult] = await conn.query(
-      `INSERT INTO orders SET
-      customer_name = ?,
-      customer_email = ?,
-      customer_phone = ?,
-      shipping_address = ?,
-      total_amount = ?,
-      payment_status = 'pending',
-      created_at = NOW()`,
-      [
-        customerData.name,
-        customerData.email,
-        customerData.phone,
-        customerData.address,
-        totalAmount,
-      ]
-    );
-
-    const orderId = orderResult.insertId;
-
-    // 2. บันทึกรายการสินค้า
-    for (const item of cartItems) {
-      await conn.query(
-        `INSERT INTO order_items SET
-        order_id = ?,
-        product_id = ?,
-        quantity = ?,
-        price = ?,
-        product_name = ?`,
-        [orderId, item.id, item.quantity, item.price, item.name]
-      );
-
-      // 3. อัปเดตสต็อกสินค้า
-      await conn.query(
-        `UPDATE products 
-        SET stock = stock - ? 
-        WHERE id = ? AND stock >= ?`,
-        [item.quantity, item.id, item.quantity]
-      );
+          if (updateResult.modifiedCount === 0) {
+            throw new Error(`Insufficient stock for product ${item.name}`);
+          }
+        }
+      });
+      return orderId;
+    } finally {
+      await session.endSession();
     }
+  } catch (txError) {
+    // If transactions are not supported (e.g., local standalone MongoDB), fallback to sequential ops
+    const isTxUnsupported = 
+      txError.message.includes("transaction") || 
+      txError.codeName === "TransactionSystemFailed" || 
+      txError.message.includes("ReplicaSet") ||
+      txError.message.includes("does not support sessions");
+      
+    if (isTxUnsupported) {
+      console.warn("Transactions/sessions not supported. Falling back to non-transactional execution.");
 
-    await conn.commit();
-    return orderId;
-  } catch (error) {
-    await conn.rollback();
-    console.error("Error creating order:", error);
-    throw new Error("Failed to create order: " + error.message);
-  } finally {
-    conn.release();
+      // Check stock first
+      for (const item of items) {
+        const product = await db.collection("products").findOne({
+          _id: ObjectId.isValid(item.id) ? new ObjectId(item.id) : item.id,
+        });
+        if (!product || product.stock < item.quantity) {
+          throw new Error(`Insufficient stock for product ${item?.name || "Unknown"}`);
+        }
+      }
+
+      // Decrement stock
+      for (const item of items) {
+        await db.collection("products").updateOne(
+          { _id: ObjectId.isValid(item.id) ? new ObjectId(item.id) : item.id },
+          { $inc: { stock: -item.quantity } }
+        );
+      }
+
+      // Insert order
+      const orderResult = await db.collection("orders").insertOne(orderDoc);
+      return orderResult.insertedId.toString();
+    }
+    throw txError;
   }
 }

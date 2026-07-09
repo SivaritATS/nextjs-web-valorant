@@ -1,5 +1,5 @@
 import ProductList from "@/components/ProductList"; 
-import { getPool } from '@/lib/db';
+import { getProducts } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,12 +7,7 @@ export default async function ShopPage() {
   let products = [];
 
   try {
-    const pool = getPool();
-    const [rows] = await pool.query(`
-      SELECT id, name, description, price, stock, image_url, type 
-      FROM products 
-    `);
-    products = JSON.parse(JSON.stringify(rows));
+    products = await getProducts();
   } catch (error) {
     console.error("Error loading products:", error);
     return (

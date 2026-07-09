@@ -1,13 +1,9 @@
-import { getPool } from '@/lib/db';
+import { getProducts } from '@/lib/db';
 
 export async function GET(req) {
-  const pool = getPool();
   try {
-    const [rows] = await pool.query(`
-      SELECT id, name, description, price, stock, image_url, type 
-      FROM products 
-    `);
-    return new Response(JSON.stringify(rows), {
+    const products = await getProducts();
+    return new Response(JSON.stringify(products), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
