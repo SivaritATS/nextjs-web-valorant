@@ -1,7 +1,6 @@
 import { MongoClient, ObjectId } from "mongodb";
 
-const uri = process.env.MONGODB_URI || "mongodb+srv://valorant_db:SNOPliLCHvOKtEYN@cluster0.sjv1ac7.mongodb.net/valorant_db?appName=Cluster0";
-const options = {};
+const uri = process.env.MONGODB_URI;
 
 let client;
 let clientPromise;
@@ -85,12 +84,12 @@ export async function createOrder(customerData, items, totalAmount) {
     }
   } catch (txError) {
     // If transactions are not supported (e.g., local standalone MongoDB), fallback to sequential ops
-    const isTxUnsupported = 
-      txError.message.includes("transaction") || 
-      txError.codeName === "TransactionSystemFailed" || 
+    const isTxUnsupported =
+      txError.message.includes("transaction") ||
+      txError.codeName === "TransactionSystemFailed" ||
       txError.message.includes("ReplicaSet") ||
       txError.message.includes("does not support sessions");
-      
+
     if (isTxUnsupported) {
       console.warn("Transactions/sessions not supported. Falling back to non-transactional execution.");
 
