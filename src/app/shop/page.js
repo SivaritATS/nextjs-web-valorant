@@ -4,7 +4,8 @@ export default async function ShopPage() {
   let products = [];
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/shop`, {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://127.0.0.1:3000";
+    const res = await fetch(`${baseUrl}/api/shop`, {
       cache: "no-store",
     });
 

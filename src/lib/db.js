@@ -4,14 +4,33 @@ let pool;
 
 export function getPool() {
   if (!pool) {
-    pool = mysql.createPool({
-      uri: process.env.DATABASE_URL,
+    let config = {
+      host: process.env.DB_HOST || "127.0.0.1",
+      port: parseInt(process.env.DB_PORT || "3306", 10),
+      user: process.env.DB_USER || "root",
+      password: process.env.DB_PASSWORD || "",
+      database: process.env.DB_NAME || "valorant_db",
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
       timezone: "+07:00",
       decimalNumbers: true,
-    });
+    };
+
+    if (process.env.DATABASE_URL) {
+      try {
+        const url = new URL(process.env.DATABASE_URL);
+        config.host = url.hostname || config.host;
+        config.port = url.port ? parseInt(url.port, 10) : config.port;
+        config.user = url.username ? decodeURIComponent(url.username) : config.user;
+        config.password = url.password ? decodeURIComponent(url.password) : config.password;
+        config.database = url.pathname ? url.pathname.replace(/^\//, "") : config.database;
+      } catch (err) {
+        console.error("Failed to parse DATABASE_URL, using defaults", err);
+      }
+    }
+
+    pool = mysql.createPool(config);
   }
   return pool;
 }

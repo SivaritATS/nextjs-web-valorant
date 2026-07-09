@@ -1,13 +1,33 @@
 "use client";
 import { useCart } from "@/context/CartContext";
 
+import Swal from "sweetalert2";
+import "sweetalert2/dist/sweetalert2.min.css";
+
+const valorantToast = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 2000,
+  timerProgressBar: true,
+  background: "#0F1923",
+  color: "#FFFFFF",
+  customClass: {
+    popup: "border-l-4 border-[#ff4655] rounded-none font-sans shadow-lg border border-gray-800",
+    title: "text-sm font-bold uppercase tracking-wider text-white"
+  }
+});
+
 export default function CardInShop({ product }) {
   const { addToCart } = useCart();
 
   const handleAddToCart = () => {
     if (product.stock > 0) {
       addToCart(product);
-      alert(`${product.name} has been added to cart!`);
+      valorantToast.fire({
+        icon: "success",
+        title: `${product.name} Added to Cart!`
+      });
     }
   };
 
