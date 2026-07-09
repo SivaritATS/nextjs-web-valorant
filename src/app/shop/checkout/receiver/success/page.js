@@ -1,7 +1,8 @@
 "use client";
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
-export default function SuccessPage() {
+function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');  // ดึง `order_id` จาก URL
 
@@ -26,3 +27,12 @@ export default function SuccessPage() {
     </div>
   );
 }
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<div className="text-center p-4">กำลังโหลด...</div>}>
+      <SuccessContent />
+    </Suspense>
+  );
+}
+

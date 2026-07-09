@@ -1,19 +1,18 @@
 import ProductList from "@/components/ProductList"; 
+import { getPool } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
 
 export default async function ShopPage() {
   let products = [];
 
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://127.0.0.1:3000";
-    const res = await fetch(`${baseUrl}/api/shop`, {
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      throw new Error("Failed to fetch products");
-    }
-
-    products = await res.json();
+    const pool = getPool();
+    const [rows] = await pool.query(`
+      SELECT id, name, description, price, stock, image_url, type 
+      FROM products 
+    `);
+    products = JSON.parse(JSON.stringify(rows));
   } catch (error) {
     console.error("Error loading products:", error);
     return (
@@ -43,3 +42,4 @@ export default async function ShopPage() {
     </div>
   );
 }
+
